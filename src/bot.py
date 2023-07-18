@@ -7,6 +7,7 @@ from random import randrange
 from src.aclient import client
 from discord import app_commands
 from src import personas, responses
+import json
 
 
 def run_discord_bot():
@@ -18,6 +19,44 @@ def run_discord_bot():
         loop.create_task(client.process_messages())
         logger.info(f'{client.user} is now running!')
 
+    @client.event
+    async def on_raw_reaction_add(playload):
+        user = playload.member.name
+        if user == client.user.name:
+            return
+        emoji = playload.emoji.name
+        id = str(playload.message_id)
+        logger.info(
+            f"\x1b[31m{user}\x1b[0m : react [{emoji}] on message ({id})")
+        with open("./chatlog.json", "r+", encoding="utf-8") as f:
+            messages = json.load(f)
+            if id not in messages:
+                return
+            if emoji in messages[id]["reactions"]:
+                messages[id]["reactions"][emoji] += 1
+            else:
+                messages[id]["reactions"][emoji] = 1
+            f.seek(0)
+            json.dump(messages, f, indent=4, ensure_ascii=False)
+            f.truncate()
+
+    @client.event
+    async def on_raw_reaction_remove(playload):
+        emoji = playload.emoji.name
+        id= str(playload.message_id)
+        logger.info(
+            f"\x1b[remove react [{emoji}] from message ({id})")
+        with open("./chatlog.json", "r+", encoding="utf-8") as f:
+            messages = json.load(f)
+            if id not in messages:
+                return
+            if emoji in messages[id]["reactions"]:
+                messages[id]["reactions"][emoji] -= 1
+            else:
+                messages[id]["reactions"][emoji] = 0
+            f.seek(0)
+            json.dump(messages, f, indent=4, ensure_ascii=False)
+            f.truncate()
 
     @client.tree.command(name="chat", description="Have a chat with GPT")
     async def chat(interaction: discord.Interaction, *, message: str):

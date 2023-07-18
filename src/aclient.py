@@ -14,6 +14,8 @@ from discord import app_commands
 from revChatGPT.V3 import Chatbot
 from revChatGPT.V1 import AsyncChatbot
 
+import pickle
+
 load_dotenv()
 
 class aclient(discord.Client):
@@ -48,7 +50,7 @@ class aclient(discord.Client):
         elif self.chat_model == "LOCAL":
             #TODO: create langchain
             os.environ["API_URL"]="http://localhost:8000/v1/chat/completions"
-            return Chatbot(api_key="empty", engine="gpt-3.5-turbo", system_prompt=prompt,max_tokens=1800)
+            return Chatbot(api_key="empty", engine="gpt-3.5-turbo", system_prompt=prompt,max_tokens=1800,temperature=0.2)
 
     async def process_messages(self):
         while True:
@@ -82,10 +84,26 @@ class aclient(discord.Client):
                 response = f"{response}{r}"
             elif self.chat_model == "LOCAL":
                 r = await responses.official_handle_response(user_message, self)
-                response = f"{response}{r}"
-            await send_split_message(self, response, message)
-            with open("./chatlog.json", "a+", encoding="utf-8") as f:
-                json.dump({"user": user_message,"author":message.user.name, "response": r}, f, indent=4, ensure_ascii=True)
+                response = f"{response}{r}\n To help us improve, please rate this response using the reactions below(👍or👎)."
+            msg=await send_split_message(self, response, message)
+            await msg.add_reaction("👍")
+            await msg.add_reaction("👎")
+            if not os.path.exists("./chatlog.json"):
+                with open("./chatlog.json", "w", encoding="utf-8") as f:
+                    messages = {}
+                    messages[msg.id] = {"message": user_message, "user": message.user.name, "response": r, "reactions": {}}
+                    json.dump(messages, f,indent=4,ensure_ascii=False)
+            else:
+                with open("./chatlog.json", "r+", encoding="utf-8") as f:
+                    messages= json.load(f)
+                    messages[msg.id] = {"message": user_message, "user": message.user.name, "response": r, "reactions": {}}
+                    f.seek(0)
+                    json.dump(messages, f, indent=4,ensure_ascii=False)
+                    f.truncate()
+            if self.chat_model == "OFFICIAL":
+                self.chatbot = self.get_chatbot_model()
+            elif self.chat_model == "LOCAL":
+                self.chatbot = self.get_chatbot_model()
         except Exception as e:
             logger.exception(f"Error while sending : {e}")
             if self.is_replying_all == "True":

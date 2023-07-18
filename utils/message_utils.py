@@ -11,20 +11,21 @@ async def send_split_message(self, response: str, message: Message):
                 code_block_chunks = [parts[i][j:j+char_limit] for j in range(0, len(parts[i]), char_limit)]
                 for chunk in code_block_chunks:
                     if self.is_replying_all:
-                        await message.channel.send(f"```{chunk}```")
+                        msg=await message.channel.send(f"```{chunk}```")
                     else:
-                        await message.followup.send(f"```{chunk}```")
+                        msg=await message.followup.send(f"```{chunk}```")
                 is_code_block = False
             else:
                 non_code_chunks = [parts[i][j:j+char_limit] for j in range(0, len(parts[i]), char_limit)]
                 for chunk in non_code_chunks:
                     if self.is_replying_all:
-                        await message.channel.send(chunk)
+                        msg=await message.channel.send(chunk)
                     else:
-                        await message.followup.send(chunk)
+                        msg=await message.followup.send(chunk)
                 is_code_block = True
     else:
         if self.is_replying_all:
-            await message.channel.send(response)
+            msg=await message.channel.send(response)
         else:
-            await message.followup.send(response)
+            msg=await message.followup.send(response)
+    return msg
