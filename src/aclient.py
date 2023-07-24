@@ -53,7 +53,6 @@ class aclient(discord.Client):
         if self.chat_model == "OFFICIAL":
             return Chatbot(api_key=self.openAI_API_key, engine=self.openAI_gpt_engine, system_prompt=prompt)
         elif self.chat_model == "LOCAL":
-            #TODO: create langchain
             # os.environ["API_URL"]="http://localhost:8000/v1/chat/completions"
             # return Chatbot(api_key="empty", engine="gpt-3.5-turbo", system_prompt=prompt,max_tokens=3500,temperature=0.2)
             os.environ["OPENAI_API_BASE"] = "http://localhost:8000/v1"
