@@ -57,7 +57,7 @@ class aclient(discord.Client):
             # return Chatbot(api_key="empty", engine="gpt-3.5-turbo", system_prompt=prompt,max_tokens=3500,temperature=0.2)
             os.environ["OPENAI_API_BASE"] = "http://localhost:8000/v1"
             os.environ["OPENAI_API_KEY"] = "empty"
-            llm = OpenAI(model="gpt-3.5-turbo")
+            llm = OpenAI(model="gpt-3.5-turbo",max_tokens=3966)
             self.memory = ChatMessageHistory()
             return llm
 

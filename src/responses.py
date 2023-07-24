@@ -27,7 +27,7 @@ async def local_handle_response(message, client) -> str:
     client.memory.add_user_message(message)
     dicts =messages_to_dict(client.memory.messages)
     messages=llama_v2_prompt(dicts, client.starting_prompt)
-    response= await sync_to_async(client.chatbot.predict)(messages)
+    response= await sync_to_async(client.chatbot.predict)(messages, max_tokens=3966, temperature=0.2)
     client.memory.add_ai_message(response)
     return response
 
