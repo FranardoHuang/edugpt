@@ -14,7 +14,9 @@ from discord import app_commands
 from revChatGPT.V3 import Chatbot
 from revChatGPT.V1 import AsyncChatbot
 
-import pickle
+from langchain.chat_models import ChatOpenAI
+from langchain.memory import ChatMessageHistory
+from langchain import OpenAI, LLMChain, PromptTemplate
 
 load_dotenv()
 
@@ -41,16 +43,25 @@ class aclient(discord.Client):
         self.chat_model = os.getenv("CHAT_MODEL")
         self.chatbot = self.get_chatbot_model()
         self.message_queue = asyncio.Queue()
+        self.memory=ChatMessageHistory()
 
-    def get_chatbot_model(self, prompt = None) -> Union[AsyncChatbot, Chatbot]:
+
+
+    def get_chatbot_model(self, prompt = None) -> Union[AsyncChatbot, Chatbot,OpenAI]:
         if not prompt:
             prompt = self.starting_prompt
         if self.chat_model == "OFFICIAL":
             return Chatbot(api_key=self.openAI_API_key, engine=self.openAI_gpt_engine, system_prompt=prompt)
         elif self.chat_model == "LOCAL":
             #TODO: create langchain
-            os.environ["API_URL"]="http://localhost:8000/v1/chat/completions"
-            return Chatbot(api_key="empty", engine="gpt-3.5-turbo", system_prompt=prompt,max_tokens=3500,temperature=0.2)
+            # os.environ["API_URL"]="http://localhost:8000/v1/chat/completions"
+            # return Chatbot(api_key="empty", engine="gpt-3.5-turbo", system_prompt=prompt,max_tokens=3500,temperature=0.2)
+            os.environ["OPENAI_API_BASE"] = "http://localhost:8000/v1"
+            os.environ["OPENAI_API_KEY"] = "empty"
+            llm = OpenAI(model="gpt-3.5-turbo")
+            self.memory = ChatMessageHistory()
+            return llm
+
 
     async def process_messages(self):
         while True:
@@ -83,7 +94,7 @@ class aclient(discord.Client):
                 r=await responses.official_handle_response(user_message, self)
                 response = f"{response}{r}"
             elif self.chat_model == "LOCAL":
-                r = await responses.official_handle_response(user_message, self)
+                r = await responses.local_handle_response(user_message, self)
                 response = f"{response}{r}\n To help us improve, please rate this response using the reactions below(👍or👎)."
             msg=await send_split_message(self, response, message)
             await msg.add_reaction("👍")
