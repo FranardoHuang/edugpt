@@ -1,6 +1,7 @@
 from src import personas
 from asgiref.sync import sync_to_async
-from langchain.schema import messages_from_dict, messages_to_dict
+from langchain.schema import messages_to_dict
+from langchain import OpenAI, LLMChain, PromptTemplate
 
 
 def llama_v2_prompt(
@@ -27,7 +28,7 @@ async def local_handle_response(message, client) -> str:
     client.memory.add_user_message(message)
     dicts =messages_to_dict(client.memory.messages)
     messages=llama_v2_prompt(dicts, client.starting_prompt)
-    response= await sync_to_async(client.chatbot.predict)(messages, max_tokens=3966, temperature=0.2)
+    response= await sync_to_async(client.chatbot.predict)(messages)
     client.memory.add_ai_message(response)
     return response
 
