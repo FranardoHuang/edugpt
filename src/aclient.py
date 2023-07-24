@@ -50,7 +50,7 @@ class aclient(discord.Client):
         elif self.chat_model == "LOCAL":
             #TODO: create langchain
             os.environ["API_URL"]="http://localhost:8000/v1/chat/completions"
-            return Chatbot(api_key="empty", engine="gpt-3.5-turbo", system_prompt=prompt,max_tokens=1800,temperature=0.2)
+            return Chatbot(api_key="empty", engine="gpt-3.5-turbo", system_prompt=prompt,max_tokens=3500,temperature=0.2)
 
     async def process_messages(self):
         while True:
@@ -100,10 +100,10 @@ class aclient(discord.Client):
                     f.seek(0)
                     json.dump(messages, f, indent=4,ensure_ascii=False)
                     f.truncate()
-            if self.chat_model == "OFFICIAL":
-                self.chatbot = self.get_chatbot_model()
-            elif self.chat_model == "LOCAL":
-                self.chatbot = self.get_chatbot_model()
+            # if self.chat_model == "OFFICIAL":
+            #     self.chatbot = self.get_chatbot_model()
+            # elif self.chat_model == "LOCAL":
+            #     self.chatbot = self.get_chatbot_model()
         except Exception as e:
             logger.exception(f"Error while sending : {e}")
             if self.is_replying_all == "True":
