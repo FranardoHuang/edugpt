@@ -95,7 +95,7 @@ class aclient(discord.Client):
                 response = f"{response}{r}"
             elif self.chat_model == "LOCAL":
                 r = await responses.local_handle_response(user_message, self)
-                response = f"{response}{r}\n To help us improve, please rate this response using the reactions below(👍or👎)."
+                response = f"{response}{r}\n If you want me to coninue, use /chat continue.\n To help us improve, please rate this response using the reactions below(👍or👎)."
             msg=await send_split_message(self, response, message)
             await msg.add_reaction("👍")
             await msg.add_reaction("👎")

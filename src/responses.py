@@ -25,6 +25,8 @@ async def official_handle_response(message, client) -> str:
     return await sync_to_async(client.chatbot.ask)(message)
 
 async def local_handle_response(message, client) -> str:
+    if len(client.memory.messages)>16:
+        client.memory.messages=client.memory.messages[-16:]
     client.memory.add_user_message(message)
     dicts =messages_to_dict(client.memory.messages)
     messages=llama_v2_prompt(dicts, client.starting_prompt)
