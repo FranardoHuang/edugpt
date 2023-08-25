@@ -24,8 +24,8 @@ def llama_v2_prompt(
 async def official_handle_response(message, client) -> str:
     return await sync_to_async(client.chatbot.ask)(message)
 
-async def local_handle_response(message, client) -> str:
-    client.memory.add_user_message(message)
+async def local_handle_response(message:str, client) -> str:
+    client.memory.add_user_message(message.strip())
     dicts =messages_to_dict(client.memory.messages)
     messages=llama_v2_prompt(dicts, client.starting_prompt)
     response= await sync_to_async(client.chatbot.predict)(messages)
