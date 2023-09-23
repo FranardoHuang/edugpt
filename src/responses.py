@@ -11,7 +11,7 @@ def llama_v2_prompt(
     B_SYS, E_SYS = "<<SYS>>\n", "\n<</SYS>>\n\n"
     BOS, EOS = "<s>", "</s>\\"
     DEFAULT_SYSTEM_PROMPT = system_prompt
-
+    messages=messages.copy()
     messages[0]['data']['content'] = B_SYS + DEFAULT_SYSTEM_PROMPT + E_SYS + messages[0]['data']["content"]
     messages_list = [
         f"{BOS}{B_INST} {(prompt['data']['content']).strip()} {E_INST} {(answer['data']['content']).strip()} {EOS}\n"
@@ -21,6 +21,21 @@ def llama_v2_prompt(
 
     return "".join(messages_list)
 
+def wizard_coder(messages: list[dict], system_prompt: str = None):
+    if system_prompt is None:
+        system_prompt="Below is an instruction that describes a task. Write a response that appropriately completes the request."
+    DEFAULT_SYSTEM_PROMPT = system_prompt+'\n\n'
+    B_INST, E_INST = "### Instruction:\n", "\n\n### Response:\n"
+    messages = messages.copy()
+    messages_list=[DEFAULT_SYSTEM_PROMPT]
+    messages_list.extend([
+        f"{B_INST}{(prompt['data']['content']).strip()}{E_INST}{(answer['data']['content']).strip()}\n\n"
+        for prompt, answer in zip(messages[::2], messages[1::2])
+    ])
+    messages_list.append(f"{B_INST}{(messages[-1]['data']['content']).strip()}{E_INST}")
+    return "".join(messages_list)
+
+
 async def official_handle_response(message, client) -> str:
     return await sync_to_async(client.chatbot.ask)(message)
 
@@ -29,7 +44,8 @@ async def local_handle_response(message, client) -> str:
         client.memory.messages=client.memory.messages[-16:]
     client.memory.add_user_message(message)
     dicts =messages_to_dict(client.memory.messages)
-    messages=llama_v2_prompt(dicts, client.starting_prompt)
+    messages=wizard_coder(dicts, client.starting_prompt)
+    # print(messages)
     response= await sync_to_async(client.chatbot.predict)(messages)
     client.memory.add_ai_message(response)
     return response

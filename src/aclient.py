@@ -58,6 +58,7 @@ class aclient(discord.Client):
             os.environ["OPENAI_API_BASE"] = "http://localhost:8000/v1"
             os.environ["OPENAI_API_KEY"] = "empty"
             llm = OpenAI(model="gpt-3.5-turbo",temperature=0.2)
+            llm.max_tokens=8192
             # llm.temperature = 0.2
             self.memory = ChatMessageHistory()
             return llm
@@ -95,7 +96,8 @@ class aclient(discord.Client):
                 response = f"{response}{r}"
             elif self.chat_model == "LOCAL":
                 r = await responses.local_handle_response(user_message, self)
-                response = f"{response}{r}\n If you want me to coninue, use /chat continue.\n To help us improve, please rate this response using the reactions below(👍or👎)."
+                # response = f"{response}{r}\n If you want me to coninue, use /chat continue.\n To help us improve, please rate this response using the reactions below(👍or👎)."
+                response = f"{response}{r}\n\n Multi-turn conversation is currently disabled.\n To help us improve, please rate this response using the reactions below(👍or👎)."
             msg=await send_split_message(self, response, message)
             await msg.add_reaction("👍")
             await msg.add_reaction("👎")
@@ -111,10 +113,11 @@ class aclient(discord.Client):
                     f.seek(0)
                     json.dump(messages, f, indent=4,ensure_ascii=False)
                     f.truncate()
-            # if self.chat_model == "OFFICIAL":
-            #     self.chatbot = self.get_chatbot_model()
-            # elif self.chat_model == "LOCAL":
-            #     self.chatbot = self.get_chatbot_model()
+            #used to disable conversation
+            if self.chat_model == "OFFICIAL":
+                self.chatbot = self.get_chatbot_model()
+            elif self.chat_model == "LOCAL":
+                self.chatbot = self.get_chatbot_model()
         except Exception as e:
             logger.exception(f"Error while sending : {e}")
             if self.is_replying_all == "True":
