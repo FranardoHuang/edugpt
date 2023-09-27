@@ -1,7 +1,7 @@
 from src import personas
 from asgiref.sync import sync_to_async
-from langchain.schema import messages_to_dict
-from langchain import OpenAI, LLMChain, PromptTemplate
+
+import openai
 
 
 def llama_v2_prompt(
@@ -21,34 +21,38 @@ def llama_v2_prompt(
 
     return "".join(messages_list)
 
-def wizard_coder(messages: list[dict], system_prompt: str = None):
-    if system_prompt is None:
-        system_prompt="Below is an instruction that describes a task. Write a response that appropriately completes the request."
-    DEFAULT_SYSTEM_PROMPT = system_prompt+'\n\n'
+def wizard_coder(history: list[dict]):
+    DEFAULT_SYSTEM_PROMPT = history[0]['content']+'\n\n'
     B_INST, E_INST = "### Instruction:\n", "\n\n### Response:\n"
-    messages = messages.copy()
+    messages = history.copy()
     messages_list=[DEFAULT_SYSTEM_PROMPT]
     messages_list.extend([
-        f"{B_INST}{(prompt['data']['content']).strip()}{E_INST}{(answer['data']['content']).strip()}\n\n"
-        for prompt, answer in zip(messages[::2], messages[1::2])
+        f"{B_INST}{(prompt['content']).strip()}{E_INST}{(answer['content']).strip()}\n\n"
+        for prompt, answer in zip(messages[1::2], messages[2::2])
     ])
-    messages_list.append(f"{B_INST}{(messages[-1]['data']['content']).strip()}{E_INST}")
+    messages_list.append(f"{B_INST}{(messages[-1]['content']).strip()}{E_INST}")
     return "".join(messages_list)
 
 
 async def official_handle_response(message, client) -> str:
     return await sync_to_async(client.chatbot.ask)(message)
 
-async def local_handle_response(message, client) -> str:
-    if len(client.memory.messages)>16:
-        client.memory.messages=client.memory.messages[-16:]
-    client.memory.add_user_message(message)
-    dicts =messages_to_dict(client.memory.messages)
-    messages=wizard_coder(dicts, client.starting_prompt)
-    # print(messages)
-    response= await sync_to_async(client.chatbot.predict)(messages)
-    client.memory.add_ai_message(response)
-    return response
+async def local_handle_response(message, client,user,stream=False):
+    # history = await client.get_chat_history(user)
+    history=None
+    if history is None:
+        history=[]
+        history.append({"role": "system", "content": client.starting_prompt})
+    history.append({"role": "user", "content": message})
+    prompt=wizard_coder(history)
+    if not stream:
+        response= await openai.Completion.acreate(model=client.openAI_gpt_engine, prompt=prompt, temperature=0.3,max_tokens=8000)
+        history.append(response['choices'][0]['message'])
+        await client.set_chat_history(user,history)
+        return response['choices'][0]['message']['content']
+    else:
+        response= await openai.Completion.acreate(model=client.openAI_gpt_engine, prompt=prompt, temperature=0.3,max_tokens=8000,stream=True)
+        return response,history
 
 
 # prompt engineering

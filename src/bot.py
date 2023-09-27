@@ -13,7 +13,7 @@ import json
 def run_discord_bot():
     @client.event
     async def on_ready():
-        await client.send_start_prompt()
+        # await client.send_start_prompt()
         await client.tree.sync()
         loop = asyncio.get_event_loop()
         loop.create_task(client.process_messages())
@@ -160,11 +160,11 @@ def run_discord_bot():
     @client.tree.command(name="reset", description="Complete reset conversation history")
     async def reset(interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=False)
-        if client.chat_model == "OFFICIAL":
-            client.chatbot = client.get_chatbot_model()
-        elif client.chat_model == "LOCAL":
-            client.chatbot = client.get_chatbot_model()
-            # await client.send_start_prompt()
+        if interaction.user == client.user:
+            return
+        username = str(interaction.user.id)
+        client.current_channel = interaction.channel
+        client.clear_chat_history(username)
         await interaction.followup.send("> **INFO: I have forgotten everything.**")
         personas.current_persona = "standard"
         logger.warning(
