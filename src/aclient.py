@@ -11,12 +11,7 @@ from utils.message_utils import send_split_message
 from dotenv import load_dotenv
 from discord import app_commands
 
-from revChatGPT.V3 import Chatbot
-from revChatGPT.V1 import AsyncChatbot
-
-from langchain.chat_models import ChatOpenAI
-from langchain.memory import ChatMessageHistory
-from langchain import OpenAI, LLMChain, PromptTemplate
+import openai
 
 load_dotenv()
 
@@ -41,26 +36,16 @@ class aclient(discord.Client):
             self.starting_prompt = f.read()
 
         self.chat_model = os.getenv("CHAT_MODEL")
-        self.chatbot = self.get_chatbot_model()
-        self.message_queue = asyncio.Queue()
-        self.memory=ChatMessageHistory()
-
-
-
-    def get_chatbot_model(self, prompt = None) -> Union[AsyncChatbot, Chatbot,OpenAI]:
-        if not prompt:
-            prompt = self.starting_prompt
         if self.chat_model == "OFFICIAL":
-            return Chatbot(api_key=self.openAI_API_key, engine=self.openAI_gpt_engine, system_prompt=prompt)
+            openai.api_key = self.openAI_API_key
         elif self.chat_model == "LOCAL":
-            # os.environ["API_URL"]="http://localhost:8000/v1/chat/completions"
-            # return Chatbot(api_key="empty", engine="gpt-3.5-turbo", system_prompt=prompt,max_tokens=3500,temperature=0.2)
-            os.environ["OPENAI_API_BASE"] = "http://localhost:8000/v1"
-            os.environ["OPENAI_API_KEY"] = "empty"
-            llm = OpenAI(model="gpt-3.5-turbo",temperature=0.2)
-            # llm.temperature = 0.2
-            self.memory = ChatMessageHistory()
-            return llm
+            openai.api_base = "http://localhost:8000/v1"
+            openai.api_key = "empty"
+        self.message_queue = asyncio.Queue()
+
+        self.chat_history = {}
+        self.chat_history_lock = asyncio.Lock()
+
 
 
     async def process_messages(self):
@@ -77,6 +62,29 @@ class aclient(discord.Client):
                             self.message_queue.task_done()
             await asyncio.sleep(1)
 
+    async def set_chat_history(self, user: str, message: list):
+        # print('set chat history')
+        async with self.chat_history_lock:
+            self.chat_history[user]=message
+
+    async def get_chat_history(self, user: str):
+        # print('get chat history')
+        async with self.chat_history_lock:
+            if user in self.chat_history:
+                # print('user',user)
+                return self.chat_history[user]
+            else:
+                # print('no user',user)
+                return None
+
+    async def clear_chat_history(self, user: str):
+        # print('clear chat history')
+        async with self.chat_history_lock:
+            if user in self.chat_history:
+                del self.chat_history[user]
+                return True
+            else:
+                return False
 
     async def enqueue_message(self, message, user_message):
         await message.response.defer(ephemeral=self.isPrivate) if self.is_replying_all == "False" else None
@@ -84,64 +92,116 @@ class aclient(discord.Client):
 
     async def send_message(self, message, user_message):
         if self.is_replying_all == "False":
-            author = message.user.id
+            user = message.user.id
         else:
-            author = message.author.id
+            user = message.author.id
+        user = str(user)
         try:
-            response = (f'> **{user_message}** - <@{str(author)}> \n\n')
-            r=''
+
             if self.chat_model == "OFFICIAL":
-                r=await responses.official_handle_response(user_message, self)
-                response = f"{response}{r}"
+                # print('official')
+                response, history = await responses.official_handle_response(user_message, self, user, stream=True)
+                end = ''
             elif self.chat_model == "LOCAL":
-                r = await responses.local_handle_response(user_message, self)
-                response = f"{response}{r}\n If you want me to coninue, use /chat continue.\n To help us improve, please rate this response using the reactions below(👍or👎)."
-            msg=await send_split_message(self, response, message)
-            await msg.add_reaction("👍")
-            await msg.add_reaction("👎")
+                response, history = await responses.local_handle_response(user_message, self, user, stream=True)
+                end = f"\n If you want me to coninue, use /chat continue.\n To help us improve, please rate this response using the reactions below(👍or👎)."
+            # msg=await send_split_message(self, response, message)
+
+            collected_messages = []
+            buffer = f'> **{user_message}** - <@{str(user)}> \n\n'
+            sent = await message.followup.send(buffer)
+            sent = await message.followup.send('generating response...')
+            msg = ''
+            current_index = 1
+            send_allowed = asyncio.Event()
+            send_allowed.set()
+
+            def on_send_done(task):
+                nonlocal sent
+                sent = task.result()  # get the result of the send task
+                send_allowed.set()  # set send_allowed
+
+            async for chunk in response:
+                if self.chat_model == "OFFICIAL":
+                    collected_messages.append(chunk['choices'][0]['delta'])
+                    msg = ''.join([m.get('content', '') for m in collected_messages])
+                elif self.chat_model == "LOCAL":
+                    collected_messages.append(chunk['choices'][0]['text'])
+                    msg = ''.join(collected_messages)
+
+                if not send_allowed.is_set():
+                    continue
+                if not msg:
+                    continue
+                send_allowed.clear()
+                msg_split = await send_split_message(client, msg, message, send=False)
+                index = len(msg_split)
+
+                if index == current_index:
+                    send_task = asyncio.create_task(sent.edit(content=msg_split[-1]))
+                else:
+                    send_task = asyncio.create_task(message.followup.send(msg_split[-1]))
+                    current_index = index
+
+                send_task.add_done_callback(on_send_done)  # add callback
+            await send_allowed.wait()  # wait for the last send to complete
+            msg_split = await send_split_message(client, msg, message, send=False)
+            index = len(msg_split)
+            if index == current_index:
+                sent = await sent.edit(content=msg_split[-1]+ end)
+            else:
+                sent = await message.followup.send(msg_split[-1]+ end)
+            if self.chat_model == "OFFICIAL":
+                role = ''.join([m.get('role', '') for m in collected_messages])
+            elif self.chat_model == "LOCAL":
+                role = "assistant"
+            assistance_message = {"role": role, "content": msg}
+            history.append(assistance_message)
+            await client.set_chat_history(user, history)
+
+            await sent.add_reaction("👍")
+            await sent.add_reaction("👎")
             if not os.path.exists("./chatlog.json"):
                 with open("./chatlog.json", "w", encoding="utf-8") as f:
                     messages = {}
-                    messages[msg.id] = {"message": user_message, "user": message.user.name, "response": r, "reactions": {}}
+                    messages[sent.id] = {"message": user_message, "user": message.user.name, "response": msg, "reactions": {}}
                     json.dump(messages, f,indent=4,ensure_ascii=False)
             else:
                 with open("./chatlog.json", "r+", encoding="utf-8") as f:
                     messages= json.load(f)
-                    messages[msg.id] = {"message": user_message, "user": message.user.name, "response": r, "reactions": {}}
+                    messages[sent.id] = {"message": user_message, "user": message.user.name, "response": msg, "reactions": {}}
                     f.seek(0)
                     json.dump(messages, f, indent=4,ensure_ascii=False)
                     f.truncate()
-            # if self.chat_model == "OFFICIAL":
-            #     self.chatbot = self.get_chatbot_model()
-            # elif self.chat_model == "LOCAL":
-            #     self.chatbot = self.get_chatbot_model()
         except Exception as e:
             logger.exception(f"Error while sending : {e}")
             if self.is_replying_all == "True":
-                await message.channel.send(f"> **ERROR: Something went wrong, please try again later!** \n ```ERROR MESSAGE: {e}```")
+                await message.channel.send(
+                    f"> **ERROR: Something went wrong, please try again later!** \n ```ERROR MESSAGE: {e}```")
             else:
-                await message.followup.send(f"> **ERROR: Something went wrong, please try again later!** \n ```ERROR MESSAGE: {e}```")
+                await message.followup.send(
+                    f"> **ERROR: Something went wrong, please try again later!** \n ```ERROR MESSAGE: {e}```")
 
-    async def send_start_prompt(self):
-        discord_channel_id = os.getenv("DISCORD_CHANNEL_ID")
-        try:
-            if self.starting_prompt:
-                if (discord_channel_id):
-                    logger.info(f"Send system prompt with size {len(self.starting_prompt)}")
-                    response = ""
-                    if self.chat_model == "OFFICIAL":
-                        response = f"{response}{await responses.official_handle_response(self.starting_prompt, self)}"
-                    elif self.chat_model == "LOCAL":
-                        response = f"{response}{await responses.local_handle_response(self.starting_prompt, self)}"
-                    channel = self.get_channel(int(discord_channel_id))
-                    await channel.send(response)
-                    logger.info(f"System prompt response:{response}")
-                else:
-                    logger.info("No Channel selected. Skip sending system prompt.")
-            else:
-                logger.info(f"Not given starting prompt. Skiping...")
-        except Exception as e:
-            logger.exception(f"Error while sending system prompt: {e}")
+    # async def send_start_prompt(self):
+    #     discord_channel_id = os.getenv("DISCORD_CHANNEL_ID")
+    #     try:
+    #         if self.starting_prompt:
+    #             if (discord_channel_id):
+    #                 logger.info(f"Send system prompt with size {len(self.starting_prompt)}")
+    #                 response = ""
+    #                 if self.chat_model == "OFFICIAL":
+    #                     response = f"{response}{await responses.official_handle_response(self.starting_prompt, self)}"
+    #                 elif self.chat_model == "LOCAL":
+    #                     response = f"{response}{await responses.local_handle_response(self.starting_prompt, self)}"
+    #                 channel = self.get_channel(int(discord_channel_id))
+    #                 await channel.send(response)
+    #                 logger.info(f"System prompt response:{response}")
+    #             else:
+    #                 logger.info("No Channel selected. Skip sending system prompt.")
+    #         else:
+    #             logger.info(f"Not given starting prompt. Skiping...")
+    #     except Exception as e:
+    #         logger.exception(f"Error while sending system prompt: {e}")
 
 
 client = aclient()
