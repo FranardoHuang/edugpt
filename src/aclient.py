@@ -128,21 +128,23 @@ class aclient(discord.Client):
                 elif self.chat_model == "LOCAL":
                     collected_messages.append(chunk['choices'][0]['text'])
                     msg = ''.join(collected_messages)
-
                 if not send_allowed.is_set():
                     continue
                 if not msg:
                     continue
-                send_allowed.clear()
                 msg_split = await send_split_message(client, msg, message, send=False)
                 index = len(msg_split)
 
+                if index == 0:
+                    continue
+                send_allowed.clear()
                 if index == current_index:
-                    send_task = asyncio.create_task(sent.edit(content=msg_split[-1]))
+                    send_task = asyncio.create_task(sent.edit(content=msg_split[current_index - 1]))
                 else:
-                    send_task = asyncio.create_task(message.followup.send(msg_split[-1]))
-                    current_index = index
-
+                    while current_index < index:
+                        send_task = asyncio.create_task(sent.edit(content=msg_split[current_index - 1]))
+                        send_task = asyncio.create_task(message.followup.send(msg_split[current_index]))
+                        current_index += 1
                 send_task.add_done_callback(on_send_done)  # add callback
             await send_allowed.wait()  # wait for the last send to complete
             msg_split = await send_split_message(client, msg, message, send=False)
