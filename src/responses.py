@@ -46,12 +46,12 @@ async def local_handle_response(message, client,user,stream=False):
     history.append({"role": "user", "content": message})
     prompt=wizard_coder(history)
     if not stream:
-        response= await openai.Completion.acreate(model=client.openAI_gpt_engine, prompt=prompt, temperature=0.3,max_tokens=8000)
+        response= await openai.Completion.acreate(model=client.openAI_gpt_engine, prompt=prompt, temperature=0.3,max_tokens=1000)
         history.append(response['choices'][0]['message'])
         await client.set_chat_history(user,history)
         return response['choices'][0]['message']['content']
     else:
-        response= await openai.Completion.acreate(model=client.openAI_gpt_engine, prompt=prompt, temperature=0.3,max_tokens=8000,stream=True)
+        response= await openai.Completion.acreate(model=client.openAI_gpt_engine, prompt=prompt, temperature=0.3,max_tokens=1000,stream=True)
         return response,history
 
 

@@ -1,4 +1,12 @@
 from discord import Message
+import string
+
+def rfind_punctuation(s, start, end):
+    for i in range(end-1, start-1, -1):  # end-1 because Python slices are exclusive at the end
+        if s[i] in string.punctuation:
+            return i
+    return -1  # If no punctuation is found
+
 
 async def send_split_message(self, response: str, message: Message,send=True):
     char_limit = 1900
@@ -12,24 +20,31 @@ async def send_split_message(self, response: str, message: Message,send=True):
         for i in range(len(parts)):
             if is_code_block:
                 code_block_chunks = []
-                for i in range(len(parts)):
-                    start = 0
-                    while start < len(parts[i]):
-                        end = start + char_limit
-                        if end >= len(parts[i]):
-                            code_block_chunks.append(parts[i][start:])
-                            break
+                start = 0
+                while start < len(parts[i]):
+                    end = start + char_limit
+                    if end >= len(parts[i]):
+                        code_block_chunks.append(parts[i][start:])
+                        break
 
-                        split_pos = parts[i].rfind('\n\n', start, end)
-                        if split_pos == -1:
-                            split_pos = parts[i].rfind('\n', start, end)
+                    split_pos = parts[i].rfind('\n\n', start, end)
+                    if split_pos == -1:
+                        split_pos = parts[i].rfind('\n', start, end)
 
-                        if split_pos == -1:
-                            split_pos = end
+                    if split_pos == -1:
+                        split_pos = rfind_punctuation(parts[i], start, end)
 
-                        code_block_chunks.append(parts[i][start:split_pos])
-                        start = split_pos
+                    if split_pos == -1:
+                        split_pos = parts[i].rfind(' ', start, end)
+
+                    if split_pos == -1 or split_pos == start:
+                        split_pos = end
+
+                    code_block_chunks.append(parts[i][start:split_pos])
+                    start = split_pos
                 for chunk in code_block_chunks:
+                    if chunk.strip() == '':
+                        continue
                     if send:
                         if self.is_replying_all:
                             msg=await message.channel.send(f"```{chunk}```")
@@ -40,24 +55,31 @@ async def send_split_message(self, response: str, message: Message,send=True):
                 is_code_block = False
             else:
                 non_code_chunks = []
-                for i in range(len(parts)):
-                    start = 0
-                    while start < len(parts[i]):
-                        end = start + char_limit
-                        if end >= len(parts[i]):
-                            non_code_chunks.append(parts[i][start:])
-                            break
+                start = 0
+                while start < len(parts[i]):
+                    end = start + char_limit
+                    if end >= len(parts[i]):
+                        non_code_chunks.append(parts[i][start:])
+                        break
 
-                        split_pos = parts[i].rfind('\n\n', start, end)
-                        if split_pos == -1:
-                            split_pos = parts[i].rfind('\n', start, end)
+                    split_pos = parts[i].rfind('\n\n', start, end)
+                    if split_pos == -1:
+                        split_pos = parts[i].rfind('\n', start, end)
 
-                        if split_pos == -1:
-                            split_pos = end
+                    if split_pos == -1:
+                        split_pos = rfind_punctuation(parts[i], start, end)
 
-                        non_code_chunks.append(parts[i][start:split_pos])
-                        start = split_pos
+                    if split_pos == -1:
+                        split_pos = parts[i].rfind(' ', start, end)
+
+                    if split_pos == -1 or split_pos == start:
+                        split_pos = end
+
+                    non_code_chunks.append(parts[i][start:split_pos])
+                    start = split_pos
                 for chunk in non_code_chunks:
+                    if chunk.strip() == '':
+                        continue
                     if send:
                         if self.is_replying_all:
                             msg=await message.channel.send(chunk)
@@ -74,7 +96,7 @@ async def send_split_message(self, response: str, message: Message,send=True):
                 msg=await message.followup.send(response)
         else:
             msg_list.append(response)
-    return msg if send else msg_list
+    return msg if send else [msg for msg in msg_list if msg.strip()]
 
 async def send_split_message_user(user,response,send=True):
     char_limit = 1900
@@ -85,24 +107,31 @@ async def send_split_message_user(user,response,send=True):
         for i in range(len(parts)):
             if is_code_block:
                 code_block_chunks = []
-                for i in range(len(parts)):
-                    start = 0
-                    while start < len(parts[i]):
-                        end = start + char_limit
-                        if end >= len(parts[i]):
-                            code_block_chunks.append(parts[i][start:])
-                            break
+                start = 0
+                while start < len(parts[i]):
+                    end = start + char_limit
+                    if end >= len(parts[i]):
+                        code_block_chunks.append(parts[i][start:])
+                        break
 
-                        split_pos = parts[i].rfind('\n\n', start, end)
-                        if split_pos == -1:
-                            split_pos = parts[i].rfind('\n', start, end)
+                    split_pos = parts[i].rfind('\n\n', start, end)
+                    if split_pos == -1:
+                        split_pos = parts[i].rfind('\n', start, end)
 
-                        if split_pos == -1:
-                            split_pos = end
+                    if split_pos == -1:
+                        split_pos = rfind_punctuation(parts[i], start, end)
 
-                        code_block_chunks.append(parts[i][start:split_pos])
-                        start = split_pos
+                    if split_pos == -1:
+                        split_pos = parts[i].rfind(' ', start, end)
+
+                    if split_pos == -1 or split_pos == start:
+                        split_pos = end
+
+                    code_block_chunks.append(parts[i][start:split_pos])
+                    start = split_pos
                 for chunk in code_block_chunks:
+                    if chunk.strip() == '':
+                        continue
                     if send:
                         msg = await user.send(f"```{chunk}```")
                     else:
@@ -110,24 +139,31 @@ async def send_split_message_user(user,response,send=True):
                 is_code_block = False
             else:
                 non_code_chunks = []
-                for i in range(len(parts)):
-                    start = 0
-                    while start < len(parts[i]):
-                        end = start + char_limit
-                        if end >= len(parts[i]):
-                            non_code_chunks.append(parts[i][start:])
-                            break
+                start = 0
+                while start < len(parts[i]):
+                    end = start + char_limit
+                    if end >= len(parts[i]):
+                        non_code_chunks.append(parts[i][start:])
+                        break
 
-                        split_pos = parts[i].rfind('\n\n', start, end)
-                        if split_pos == -1:
-                            split_pos = parts[i].rfind('\n', start, end)
+                    split_pos = parts[i].rfind('\n\n', start, end)
+                    if split_pos == -1:
+                        split_pos = parts[i].rfind('\n', start, end)
 
-                        if split_pos == -1:
-                            split_pos = end
+                    if split_pos == -1:
+                        split_pos = rfind_punctuation(parts[i], start, end)
 
-                        non_code_chunks.append(parts[i][start:split_pos])
-                        start = split_pos
+                    if split_pos == -1:
+                        split_pos = parts[i].rfind(' ', start, end)
+
+                    if split_pos == -1 or split_pos == start:
+                        split_pos = end
+
+                    non_code_chunks.append(parts[i][start:split_pos])
+                    start = split_pos
                 for chunk in non_code_chunks:
+                    if chunk.strip() == '':
+                        continue
                     if send:
                         msg = await user.send(chunk)
                     else:
@@ -138,4 +174,4 @@ async def send_split_message_user(user,response,send=True):
             msg = await user.send(response)
         else:
             msg_list.append(response)
-    return msg if send else msg_list
+    return msg if send else [msg for msg in msg_list if msg.strip()]
