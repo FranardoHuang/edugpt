@@ -13,44 +13,102 @@
 
 ![image](https://user-images.githubusercontent.com/89479282/206497774-47d960cd-1aeb-4fba-9af5-1f9d6ff41f00.gif)
 
+
 # Setup
 
-## Critical prerequisites to install
+Please install GPU PyTorch: https://pytorch.org/get-started/locally/
 
-* run ```pip3 install -r requirements.txt```
+## Optional: Create a new enviornment
 
-* **Rename the file `.env.example` to `.env`**
+1. Use terminal or an anaconda prompt
+```bash
+conda create --name myenv
+```
+
+2. Replace myenv with the name of your enviornment
+  
+3. When conda asks to proceed type y
+```bash
+proceed ([y]/n)?
+```
+
+4. Now navigate to new enviornment for following instructions
+```bash
+conda activate myenv
+```
+
+## Critical components to install
+
+### Installing FastChat
+
+1. Clone this repository and navigate to the FastChat folder
+```bash
+git clone https://github.com/lm-sys/FastChat.git FastChat
+cd FastChat
+```
+
+If you are running on Mac:
+```bash
+brew install rust cmake
+```
+
+2. Install Package
+```bash
+pip3 install --upgrade pip  # enable PEP 660 support
+pip3 install -e ".[model_worker,webui]"
+```
+
+### Installing EduGpt
+
+1. Clone this repository
+```bash
+git clone https://github.com/FranardoHuang/edugpt.git edugpt
+cd FastChat
+```
+
+2. Navigate to folder
+```bash 
+cd edugpt
+```
+
+3. Install requirements
+```bash 
+pip3 install -r requirements.txt
+```
 
 * Recommended python version `3.9` +
 ---
-## Step 1: Create a Discord bot
+## Creating a Discord Bot
+
+### Step 1: Creating a bot
 
 1. Go to https://discord.com/developers/applications create an application
+  
 2. Build a Discord bot under the application
+  
 3. Get the token from bot setting
 
    ![image](https://user-images.githubusercontent.com/89479282/205949161-4b508c6d-19a7-49b6-b8ed-7525ddbef430.png)
-4. Store the token to `.env` under the `DISCORD_BOT_TOKEN`
+   
+5. Store the token to `.env` under the `DISCORD_BOT_TOKEN`
 
    <img height="190" width="390" alt="image" src="https://user-images.githubusercontent.com/89479282/222661803-a7537ca7-88ae-4e66-9bec-384f3e83e6bd.png">
 
-5. Turn MESSAGE CONTENT INTENT `ON`
+6. Turn MESSAGE CONTENT INTENT `ON`
 
    ![image](https://user-images.githubusercontent.com/89479282/205949323-4354bd7d-9bb9-4f4b-a87e-deb9933a89b5.png)
 
-6. Invite your bot to your server via OAuth2 URL Generator
+7. Invite your bot to your server via OAuth2 URL Generator
 
    ![image](https://user-images.githubusercontent.com/89479282/205949600-0c7ddb40-7e82-47a0-b59a-b089f929d177.png)
----
-> **Note**
->
-> In Step 2, you only need to complete the authentication process for the model you want to use (it's not necessary to complete all Step 2)
-> 
-> Remember to modify `CHAT_MODEL` to the default model you want to use in `.env` file
 
-## Step 2: Official API authentication
+8. To use URL Generator go to general and create a redirect URI, please change the CLIENTID to application ID of your bot
+https://discordapp.com/oauth2/authorize?client_id=CLIENTID&scope=bot
 
-### Geanerate an OpenAI API key
+
+### Step 2: Official API authentication
+
+#### Geanerate an OpenAI API key
 1. Go to https://beta.openai.com/account/api-keys
 
 2. Click Create new secret key
@@ -59,59 +117,22 @@
 
 3. Store the SECRET KEY to `.env` under the `OPENAI_API_KEY`
 
----
-## Step 2: Website ChatGPT authentication
-
-> **Only Support ChatGPT Plus Account**
-
-1. Open https://chat.openai.com/api/auth/session
-
-2. Open console with `F12`
-
-3. Open `Application` tab > Cookies
-
-   ![image](https://user-images.githubusercontent.com/89479282/229298001-41ab4f61-5b79-4c65-b08c-708ee6fe2304.png)
-
-4. Copy the value for `_puid` from cookies and paste it into `.env` under `PUID`
-
-5. Copy the value for `accessToken` from cookies and paste it into `.env` under `ACCESS_TOKEN`
-
----
-## Step 2: Google Bard authentication
-1. Go to https://bard.google.com/
-
-2. Open console with `F12`
-
-3. Open `Application` tab > Cookies
-
-4. Copy the value for `__Secure-1PSID` from cookies and paste it into `.env` under `BARD_SESSION_ID`
-
----
-## Step 2: Microsoft Bing authentication
-1. **Rename the file `cookies.dev.json` to `cookies.json`**
-
-2. Go to https://bing.com/chat and log in your Microsoft account
-
-3. Use Cookie Editor or similar extensions to export the cookies
-
-4. Paste it into `cookies.json`
-
----
-## Step 3: Run the bot on the desktop
+### Step 3: Run the bot on the desktop
 
 1. Open a terminal or command prompt
 
 2. Navigate to the directory where you installed the ChatGPT Discord bot
 
 3. Run `python3 main.py` or `python main.py` to start the bot
----
-## Step 3: Run the bot with Docker
+   
+
+### Step 3: Run the bot with Docker
 
 1. Build the Docker image & Run the Docker container `docker compose up -d`
 
 2. Inspect whether the bot works well `docker logs -t chatgpt-discord-bot`
 
-   ### Stop the bot:
+   #### Stop the bot:
 
    * `docker ps` to see the list of running services
    * `docker stop <BOT CONTAINER ID>` to stop the running bot
