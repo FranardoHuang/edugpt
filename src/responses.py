@@ -1,8 +1,11 @@
 from src import personas
 from asgiref.sync import sync_to_async
-
+import os
+import pickle
 import openai
-
+import numpy as np
+from dotenv import load_dotenv
+load_dotenv()
 
 def llama_v2_prompt(
         messages: list[dict], system_prompt: str = None
@@ -37,21 +40,59 @@ def wizard_coder(history: list[dict]):
 async def official_handle_response(message, client) -> str:
     return await sync_to_async(client.chatbot.ask)(message)
 
-async def local_handle_response(message, client,user,stream=False):
+
+def gpt(history: list[dict]):
+    l = [x['content'] for x in history]
+    return '\n---\n'.join(l)
+async def local_handle_response(message, client,user,stream=False,rag=False):
     # history = await client.get_chat_history(user)
+
+    if rag:
+        picklefile = "recursive_seperate_none_openai_embedding_textbook_1100.pkl"
+        path_to_pickle = os.path.join("/home/bot/localgpt/rag/pickle/", picklefile)
+        with open(path_to_pickle, 'rb') as f:
+            data_loaded = pickle.load(f)
+        doc_list = data_loaded['doc_list']
+        embedding_list = data_loaded['embedding_list']
+        history = [{"role": "user", "content": message}]
+        # OPENAI
+        openai.api_key = os.getenv("OPENAI_API_KEY")
+        openai.api_base = "https://api.openai.com/v1"
+        query_embed = np.array(openai.Embedding.create(model="text-embedding-ada-002", input=gpt(history))['data'][0]['embedding'])
+        # model
+        openai.api_key = "empty"
+        openai.api_base = "http://localhost:8000/v1"
+        cosine_similarities = np.dot(embedding_list, query_embed)
+        indices = np.argsort(cosine_similarities)[::-1]
+        docs = doc_list[indices]
+        top_docs=docs[:3]
+        distances = cosine_similarities[:3]
+        print(distances)
+        insert_document = ""
+        for i, docu in enumerate(top_docs):
+            insert_document += f"doc{i + 1}: {docu}\n"
+        print(insert_document)
+
+        # message = "question: " + message + "\n---\n" + insert_document
+        # message = "question: " + message
+        document_no_space=insert_document.replace("\n", ' ')
+        message = (f"Is the question:({message.strip()}) related to document:({document_no_space})?\n"
+                   f"Just give me an Answer yes or no.\n")
+        print(message)
     history=None
     if history is None:
         history=[]
         history.append({"role": "system", "content": client.starting_prompt})
     history.append({"role": "user", "content": message})
-    prompt=wizard_coder(history)
+    # prompt=wizard_coder(history)
     if not stream:
-        response= await openai.Completion.acreate(model=client.openAI_gpt_engine, prompt=prompt, temperature=0.3,max_tokens=1000)
-        history.append(response['choices'][0]['message'])
+
+        response= await openai.ChatCompletion.acreate(model=client.openAI_gpt_engine, messages=history, temperature=0.3,max_tokens=1000)
+        history.append(response['choices'][0]['message'].replace('\n\n\n',''))
         await client.set_chat_history(user,history)
-        return response['choices'][0]['message']['content']
+        return response['choices'][0]['message']['content'].replace('\n\n\n','')
     else:
-        response= await openai.Completion.acreate(model=client.openAI_gpt_engine, prompt=prompt, temperature=0.3,max_tokens=1000,stream=True)
+        response= await openai.ChatCompletion.acreate(model=client.openAI_gpt_engine, messages=history, temperature=0.3,max_tokens=1000,stream=True)
         return response,history
 
 

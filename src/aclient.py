@@ -103,7 +103,7 @@ class aclient(discord.Client):
                 response, history = await responses.official_handle_response(user_message, self, user, stream=True)
                 end = ''
             elif self.chat_model == "LOCAL":
-                response, history = await responses.local_handle_response(user_message, self, user, stream=True)
+                response, history = await responses.local_handle_response(user_message, self, user, stream=True, rag=True)
                 end = f"\n If you want me to coninue, use /chat continue.\n To help us improve, please rate this response using the reactions below(👍or👎)."
             # msg=await send_split_message(self, response, message)
 
@@ -126,8 +126,8 @@ class aclient(discord.Client):
                     collected_messages.append(chunk['choices'][0]['delta'])
                     msg = ''.join([m.get('content', '') for m in collected_messages])
                 elif self.chat_model == "LOCAL":
-                    collected_messages.append(chunk['choices'][0]['text'])
-                    msg = ''.join(collected_messages)
+                    collected_messages.append(chunk['choices'][0]['delta'])
+                    msg = ''.join([m.get('content', '') for m in collected_messages])
                 if not send_allowed.is_set():
                     continue
                 if not msg:
@@ -156,7 +156,7 @@ class aclient(discord.Client):
             if self.chat_model == "OFFICIAL":
                 role = ''.join([m.get('role', '') for m in collected_messages])
             elif self.chat_model == "LOCAL":
-                role = "assistant"
+                role = ''.join([m.get('role', '') for m in collected_messages])
             assistance_message = {"role": role, "content": msg}
             history.append(assistance_message)
             await client.set_chat_history(user, history)
