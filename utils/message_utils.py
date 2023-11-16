@@ -13,7 +13,7 @@ async def send_split_message(self, response: str, message: Message,send=True):
     msg_list = []
     # print(len(response))
     # print(response)
-    if len(response) > char_limit:
+    if len(response) > char_limit and "```" not in response:
         is_code_block = False
         parts = response.split("```")
 
@@ -101,7 +101,7 @@ async def send_split_message(self, response: str, message: Message,send=True):
 async def send_split_message_user(user,response,send=True):
     char_limit = 1900
     msg_list = []
-    if len(response) > char_limit:
+    if len(response) > char_limit and "```" not in response:
         is_code_block = False
         parts = response.split("```")
         for i in range(len(parts)):
