@@ -141,11 +141,12 @@ async def local_handle_response(message, client,user,stream=False,rag=False):
         # system_message="通过阅读以下材料,用中文回答我的指示"
         # print(chat_completion(system_message, insert_document))
     history=[]
-    if history is None:
-        history=[]
+    # if history is None:
+    #     history=[]
+    if not history:
         history.append({"role": "system", "content": system_message})
     history.append({"role": "user", "content": insert_document})
-    prompt=wizard_coder(history)
+    # prompt=wizard_coder(history)
     if not stream:
 
         response= await openai.ChatCompletion.acreate(model=client.openAI_gpt_engine, messages=history, temperature=0.3,max_tokens=1000)
